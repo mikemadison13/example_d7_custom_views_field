@@ -1,1 +1,1 @@
-# example_d7_custom_views_field
+# Example D7 Module to Add Custom Views Field(s)

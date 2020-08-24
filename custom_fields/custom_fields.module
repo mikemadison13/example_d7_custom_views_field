@@ -1,0 +1,136 @@
+<?php
+/**
+ * Implements hook_views_api().
+ * Used to define custom fields for BASC
+ * @author Mike Madison
+ */
+function custom_fields_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'custom_fields') . '/views',
+  );
+}
+
+/**
+ * Implements hook_theme().
+ * Used to define custom theme function for title template rendering
+ * @author Mike Madison
+ */
+function custom_fields_theme($existing, $type, $theme, $path) {
+  global $base_url;
+  return array(
+    'custom_fields_title' => array(
+      'template' => 'templates/custom_fields_title',
+      'variables' => array(
+        'type' => 'page',
+        'path' => $base_url,
+        'title' => null,
+        'size' => null,
+        'field_kit_1' => null,
+        'field_kit_2' => null,
+      ),
+    ),
+  );
+}
+
+/**
+  * Analyzes an entity and based on its content type, returns a themed title with custom 
+  * destination url and behavior (size, field kit, etc.)
+  * @param object $entity is a loaded node object
+  * @return string is a formatted / rendered string ready for display
+  * @author Mike Madison
+*/
+function _customTitle($entity) {
+  global $base_url;
+  global $user;
+  $render = array();
+  $render['path'] = drupal_lookup_path('alias',"node/$entity->nid");
+  //Always display the node's title
+  $render['title'] = $entity->title;
+  //Display the name of the content type
+  $type = node_type_load($entity->type);
+  $render['type'] = "$type->name: ";
+  /** 
+    * The path will change based on content type:
+    * Case Studies and Resources: file field first, then link field, otherwise title only
+    * Presentation: file field only
+    * Video: link to node but display file size (if a video file)
+    * Resource Guides, Code Briefs, and Default link to node
+    * 
+  */
+  switch ($entity->type) {
+    case "case_study":
+    case "building_america_resource":
+      if (isset($entity->field_cad_file['und'][0])) {
+        $render['path'] = file_create_url($entity->field_cad_file['und'][0]['uri']);
+        $render['size'] = _convertSize($entity->field_cad_file['und'][0]['filesize']);
+      } 
+      elseif (isset($entity->field_link['und'][0])) {
+        $render['path'] = $entity->field_link['und'][0]['url'];
+      } 
+      break;
+    case "presentation":
+      if (isset($entity->field_original_presentation_file['und'][0])) {
+        $render['path'] = file_create_url($entity->field_original_presentation_file['und'][0]['uri']);
+        $render['size'] = _convertSize($entity->field_original_presentation_file['und'][0]['filesize']);
+      }
+      break;
+    case "video": 
+      if (isset($entity->field_video_file['und'][0])) {
+        $render['size'] = _convertSize($entity->field_video_file['und'][0]['filesize']);
+      } 
+      break;
+  }
+  
+  /**
+    * Field Kits should only appear for authenticated users, and only for the 
+    * following content types:
+    * Building Science Measures, Videos, Case Studies, Guides, and Videos
+  */
+  if (user_is_logged_in()) {
+    switch ($entity->type) {
+      case 'building_science_measures': 
+      case 'case_study': 
+      case 'resource_guide':
+      case 'information_guide': 
+      case 'video';
+        $render['field_kit_1'] = views_embed_view('flag_lists_field_kit_toggle','default', $entity->nid, $user->uid);
+        $render['field_kit_2'] = views_embed_view('flag_lists_field_kit_node_flag_count', 'default', $user->uid, $entity->nid);
+        break;
+    }
+  }
+  return theme('custom_fields_title', $render);
+}
+
+/**
+  * Accepts an integer (file size) and converts it into a string of human readable file sizes
+  * @param int $size (defaults to 0)
+  * @return string $bytes formatted as kb/mb/gb/tb
+  * @author Mike Madison
+*/
+function _customSize($size=0) {
+  $precision = null;
+  $bytes = $size;
+  $kilobyte = 1024;
+  $megabyte = $kilobyte * 1024;
+  $gigabyte = $megabyte * 1024;
+  $terabyte = $gigabyte * 1024;
+  if (($bytes >= 0) && ($bytes < $kilobyte)) {
+    return $bytes . ' B';
+  } 
+  elseif (($bytes >= $kilobyte) && ($bytes < $megabyte)) {
+    return round($bytes / $kilobyte, $precision) . ' KB';
+  } 
+  elseif (($bytes >= $megabyte) && ($bytes < $gigabyte)) {
+    return round($bytes / $megabyte, $precision) . ' MB';
+  } 
+  elseif (($bytes >= $gigabyte) && ($bytes < $terabyte)) {
+    return round($bytes / $gigabyte, $precision) . ' GB';
+  } 
+  elseif ($bytes >= $terabyte) {
+    return round($bytes / $terabyte, $precision) . ' TB';
+  } 
+  else {
+    return $bytes . ' B';
+  }
+}

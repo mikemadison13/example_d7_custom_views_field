@@ -1,0 +1,10 @@
+name = Custom Fields Module
+description = This module provides custom fields using the views API 
+core = 7.x
+package = PNNL
+version = 7.x-1.00
+dependencies[] = views
+dependencies[] = search_api
+dependencies[] = flag
+dependencies[] = flag_lists
+files[] = "views/custom_fields_title_handler.inc"
